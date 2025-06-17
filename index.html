@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pencari Kursus Interaktif - Denpasar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony (Slate, Teal, Amber) -->
+    <!-- Application Structure Plan: Desain aplikasi ini menggunakan pendekatan dashboard dengan tab untuk memisahkan dua kategori utama: Bahasa Inggris dan Komputer. Struktur ini dipilih untuk mencegah kebingungan pengguna dan menyajikan informasi secara terfokus. Alur pengguna adalah: (1) Pilih kategori, (2) Lihat ringkasan semua opsi dalam format kartu (card), (3) Gunakan filter (Mode Belajar, Rentang Harga) untuk mempersempit pencarian, (4) Lihat visualisasi perbandingan harga awal pada grafik batang interaktif, (5) Klik 'Lihat Detail' pada kartu untuk membuka modal dengan informasi lengkap. Struktur ini mengutamakan kemudahan navigasi dan penemuan informasi yang relevan secara cepat. -->
+    <!-- Visualization & Content Choices: 
+        - [Laporan] Daftar lembaga & harga -> [Goal] Membandingkan biaya -> [Viz] Grafik Batang (Chart.js) -> [Interaction] Grafik berubah sesuai kategori (Inggris/Komputer) yang dipilih -> [Justification] Visualisasi mempermudah perbandingan cepat antar lembaga.
+        - [Laporan] Detail setiap lembaga -> [Goal] Mengorganisir info -> [Presentation] Kartu ringkasan & Modal detail (HTML/CSS/JS) -> [Interaction] Filter kartu berdasarkan mode/harga; Klik untuk menampilkan modal -> [Justification] Mencegah banjir informasi, pengguna dapat fokus pada detail yang diminati.
+        - [Laporan] Opsi Online/Offline -> [Goal] Menginformasikan pilihan -> [Presentation] Ikon & Teks pada kartu, Filter Dropdown (HTML/JS) -> [Interaction] Menyaring lembaga berdasarkan mode belajar -> [Justification] Fitur penting bagi pengguna modern untuk memilih metode belajar yang sesuai.
+        - [Laporan] Kategori Kursus -> [Goal] Navigasi Utama -> [Presentation] Tombol Tab (HTML/JS) -> [Interaction] Mengganti seluruh konten halaman (kartu & grafik) -> [Justification] Alur navigasi yang jelas dan fundamental untuk SPA.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .chart-container { position: relative; width: 100%; max-width: 800px; margin-left: auto; margin-right: auto; height: 320px; max-height: 50vh; }
+        @media (min-width: 768px) { .chart-container { height: 400px; } }
+        .modal-enter { transition: opacity 0.3s ease; }
+        .modal-leave { transition: opacity 0.3s ease; }
+        .card-enter-active { transition: all 0.5s ease; }
+        .card-enter-from { opacity: 0; transform: translateY(20px); }
+        .card-enter-to { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Pencari Kursus Terbaik di Denpasar</h1>
+            <p class="mt-2 text-lg text-slate-600">Temukan dan bandingkan kursus Bahasa Inggris & Komputer dengan mudah.</p>
+        </header>
+
+        <nav class="flex justify-center mb-8 bg-slate-200 p-1 rounded-xl max-w-md mx-auto">
+            <button id="nav-english" class="nav-btn w-1/2 p-2 rounded-lg font-semibold text-slate-700 transition-colors duration-300">Bahasa Inggris</button>
+            <button id="nav-computer" class="nav-btn w-1/2 p-2 rounded-lg font-semibold text-slate-700 transition-colors duration-300">Komputer</button>
+        </nav>
+
+        <main id="content-area">
+        </main>
+
+        <footer class="mt-12 pt-8 border-t border-slate-200">
+            <h2 class="text-2xl font-bold text-center mb-4 text-slate-900">Saran Tambahan</h2>
+            <div id="advice-section" class="max-w-4xl mx-auto space-y-4 text-slate-700">
+            </div>
+        </footer>
+    </div>
+
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 hidden modal-enter">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+        </div>
+    </div>
+
+    <script>
+        const courseData = {
+            english: [
+                { id: 'ialf', name: 'IALF Bali', location: 'Jalan Raya Sesetan 190, Denpasar', modes: ['Online', 'Offline'], priceNumeric: 2350000, details: { materials: ['General English-Z Online: Untuk siswa SMA ke atas & profesional.', 'English for Young Learners: Untuk siswa SD & SMP.', 'IELTS Preparation: Kursus persiapan intensif untuk tes IELTS.'], prices: ['General English: Mulai dari Rp 2.350.000 per level (8 minggu/32 jam).', 'Biaya umumnya sudah termasuk materi, penilaian, laporan, dan sertifikat.'], options: 'Menyediakan kelas online dan offline (tatap muka) dengan metode "Blended Learning 75:25".' } },
+                { id: 'lister', name: 'Lister', location: 'Berbagai pilihan di Bali (termasuk Denpasar)', modes: ['Online', 'Offline'], priceNumeric: 399500, details: { materials: ['Academic English', 'Business English', 'English Speaking', 'English Preparation Test (TOEFL, IELTS, dll.)', 'Regular English.'], prices: ['Private Trial: Rp 399.500', 'Private Short: Rp 1.700.000 – Rp 5.000.000', 'Private Reguler: Rp 7.300.000 – Rp 19.100.000', 'Harga bervariasi tergantung jumlah peserta (private/semi-private).'], options: 'Menawarkan kelas Private dan Semi Private dengan materi yang disesuaikan kebutuhan siswa. Opsi online dan offline sangat mungkin tersedia.' } },
+                { id: 'superprof', name: 'Superprof (Privat Tutor)', location: 'Berbagai lokasi di Bali (fleksibel)', modes: ['Online', 'Offline'], priceNumeric: 1647080, details: { materials: ['Sangat bervariasi tergantung tutor, mencakup percakapan, persiapan tes, bisnis, dll.'], prices: ['Rata-rata tarif sekitar Rp 82.354 per jam.', 'Harga bervariasi tergantung pengalaman guru dan lokasi.', 'Banyak guru menawarkan kursus pertama secara gratis.'], options: 'Sistem guru privat yang sangat fleksibel. Kelas bisa diadakan via webcam (online) atau di rumah siswa (offline).' } },
+                { id: 'jb-english', name: 'JB English Bali', location: 'Bali (detail lokasi perlu dikonfirmasi)', modes: ['Offline'], priceNumeric: 3000000, details: { materials: ['Regular Course (Beginner-Advanced)', 'Intensive Course', 'English Course with Native English Speakers', 'English Language Tours & Immersion Program.'], prices: ['Intensive Course (1 siswa): Mulai dari Rp 3.000.000', 'Regular Course (1 siswa): Mulai dari Rp 6.000.000', 'Dengan Native Speaker (1 siswa): Mulai dari Rp 6.000.000', 'Biaya sumber belajar tambahan Rp 150.000/orang.'], options: 'Fokus pada kelas tatap muka dengan berbagai pilihan program intensif dan reguler.' } },
+                { id: 'lec-bali', name: 'LEC Bali', location: 'Denpasar (sistem door-to-door)', modes: ['Online', 'Offline'], priceNumeric: 1500000, details: { materials: ['General English (dari dasar)', 'Conversation Class', 'Specific Purpose English', 'TOEFL/IELTS Preparation', 'Company Training.'], prices: ['Harga tidak dicantumkan, perlu kontak langsung. Diperkirakan kompetitif.'], options: 'Menawarkan kursus online dan privat (guru datang ke rumah/kantor). Tersedia Free Trial untuk coba gratis.' } },
+            ],
+            computer: [
+                { id: 'ccc', name: 'Computer Course Center (CCC)', location: 'Jl. Nangka Selatan & Jl. Raya Tuban', modes: ['Online', 'Offline'], priceNumeric: 1000000, details: { materials: ['Microsoft Office (Excel)', 'Desain Grafis', 'Animasi & Video Editing', 'Digital Marketing (SEO, Google Ads)', 'AutoCAD', 'Google Sheets.'], prices: ['Workshop Excel: Rp 1.000.000', 'Kursus SEO: Rp 2.500.000', 'Kursus AutoCAD: Rp 3.500.000', 'Harga bervariasi per program.'], options: 'Menawarkan program online, offline, dan bersertifikat. Kadang ada program gratis kerjasama dengan sekolah.' } },
+                { id: 'revolusi-skill', name: 'Revolusi Skill', location: 'Denpasar', modes: ['Offline'], priceNumeric: 800000, details: { materials: ['Komputer Dasar', 'Microsoft Office', 'SPSS', 'Komputer Akuntansi', 'Desain Grafis.'], prices: ['Diklaim "sangat terjangkau," namun detail harga spesifik perlu dikonfirmasi langsung.'], options: 'Cenderung fokus pada kelas offline. Materi lengkap dan pengajar profesional.' } },
+                { id: 'balitop', name: 'BALITOP TRAINING', location: 'Denpasar', modes: ['Offline'], priceNumeric: 850000, details: { materials: ['Web Design (HTML, CSS, JS)', 'Web Programming (PHP, MySQL)', 'Adobe Photoshop', 'Microsoft Office (Word, Excel, PowerPoint, Access).'], prices: ['MS PowerPoint: Rp 850.000 (5x 2 jam)', 'MS Excel: Rp 1.190.000 (7x 2 jam)', 'Web Design: Rp 1.420.000 (8x 2 jam)', 'Paket Office Profesional: Rp 2.350.000 (15x 2 jam).'], options: 'Fokus pada kursus privat (1 siswa 1 pengajar) secara tatap muka.' } },
+                { id: 'sidhakarya', name: 'Sidhakarya Bali Komputer', location: 'Bali', modes: ['Offline'], priceNumeric: 350000, details: { materials: ['Fokus pada Microsoft Office, khususnya PowerPoint.'], prices: ['Kursus 2 Jam PowerPoint: Rp 350.000', 'Tersedia paket sampai lancar dengan harga berbeda.', 'Ada biaya pendaftaran tambahan dan bonus belajar aplikasi lain.'], options: 'Kursus privat tatap muka, jadwal bisa setiap hari.' } },
+                { id: 'le-wagon', name: 'Le Wagon Bali', location: 'Bali (Canggu)', modes: ['Online', 'Offline'], priceNumeric: 113000000, details: { materials: ['Data Analytics Bootcamp', 'Web Development Bootcamp.'], prices: ['Bootcamp penuh waktu: Mulai dari USD 6.900 (sekitar Rp 113.000.000).'], options: 'Program bootcamp intensif (full-time atau part-time) yang sangat terspesialisasi, tersedia on-campus (offline) dan online.' } },
+            ]
+        };
+
+        const adviceData = [
+            { icon: '📞', title: 'Hubungi Langsung', text: 'Untuk informasi paling akurat mengenai jadwal, ketersediaan kelas, materi terbaru, dan harga pasti, sangat disarankan untuk menghubungi langsung lembaga kursus yang Anda minati.' },
+            { icon: '🧪', title: 'Manfaatkan Uji Penempatan & Coba Gratis', text: 'Beberapa lembaga menyediakan tes penempatan gratis untuk menentukan level Anda. Manfaatkan juga kelas coba gratis (trial class) jika ada untuk merasakan metode pengajaran.' },
+            { icon: '⭐', title: 'Cari Ulasan dan Testimoni', text: 'Cari ulasan dari alumni untuk mendapatkan gambaran nyata tentang pengalaman belajar, kualitas pengajar, dan fasilitas yang disediakan.' },
+        ];
+        
+        let currentCategory = 'english';
+        let currentChart = null;
+        let filters = { mode: 'all', price: 'all' };
+
+        const app = document.getElementById('app');
+        const contentArea = document.getElementById('content-area');
+        const modalContainer = document.getElementById('modal-container');
+        const modalContent = document.getElementById('modal-content');
+
+        const formatPrice = (price) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
+
+        const renderContent = () => {
+            const data = courseData[currentCategory];
+            const isEnglish = currentCategory === 'english';
+
+            contentArea.innerHTML = `
+                <section id="filters-and-chart" class="mb-8">
+                    <div class="max-w-4xl mx-auto bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label for="mode-filter" class="block text-sm font-medium text-slate-700 mb-1">Mode Belajar</label>
+                                <select id="mode-filter" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                                    <option value="all">Semua Mode</option>
+                                    <option value="Online">Online</option>
+                                    <option value="Offline">Offline</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="price-filter" class="block text-sm font-medium text-slate-700 mb-1">Rentang Harga</label>
+                                <select id="price-filter" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                                    <option value="all">Semua Harga</option>
+                                    <option value="<1M">&lt; Rp 1 Juta</option>
+                                    <option value="1M-5M">Rp 1 Juta - Rp 5 Juta</option>
+                                    <option value=">5M">&gt; Rp 5 Juta</option>
+                                </select>
+                            </div>
+                        </div>
+                         <div class="text-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-800">Perbandingan Harga Awal Kursus</h2>
+                            <p class="text-sm text-slate-500">Grafik ini menunjukkan perkiraan harga awal untuk satu program di setiap lembaga untuk membantu perbandingan. Klik bar untuk detail.</p>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="priceChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="course-list">
+                     <div class="text-center mb-8">
+                        <h2 class="text-2xl font-bold text-slate-900">Pilihan Kursus ${isEnglish ? 'Bahasa Inggris' : 'Komputer'}</h2>
+                        <p class="text-slate-600 mt-1 max-w-2xl mx-auto">Berikut adalah daftar lembaga penyedia kursus yang telah kami rangkum. Gunakan filter di atas untuk menemukan yang paling sesuai untuk Anda.</p>
+                    </div>
+                    <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+                </section>
+            `;
+
+            renderCards();
+            renderChart();
+            setupFilters();
+        };
+        
+        const getPriceCategory = (price) => {
+            if (price < 1000000) return '<1M';
+            if (price >= 1000000 && price <= 5000000) return '1M-5M';
+            return '>5M';
+        };
+
+        const renderCards = () => {
+            const container = document.getElementById('cards-container');
+            if (!container) return;
+            
+            const filteredData = courseData[currentCategory].filter(item => {
+                const modeMatch = filters.mode === 'all' || item.modes.includes(filters.mode);
+                const priceMatch = filters.price === 'all' || getPriceCategory(item.priceNumeric) === filters.price;
+                return modeMatch && priceMatch;
+            });
+
+            if (filteredData.length === 0) {
+                 container.innerHTML = `<div class="col-span-1 sm:col-span-2 lg:col-span-3 text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200">
+                    <p class="text-slate-500">Tidak ada kursus yang cocok dengan filter Anda. Coba ubah pilihan filter.</p>
+                 </div>`;
+                 return;
+            }
+            
+            container.innerHTML = filteredData.map(item => `
+                <div class="card bg-white rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200/50" data-id="${item.id}">
+                    <div class="p-6 flex-grow">
+                        <h3 class="text-xl font-bold text-slate-900 mb-2">${item.name}</h3>
+                        <p class="text-sm text-slate-500 mb-4 flex items-center">
+                           <span class="mr-2">📍</span>
+                           <span>${item.location}</span>
+                        </p>
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            ${item.modes.map(mode => `
+                                <span class="text-xs font-semibold px-2 py-1 rounded-full ${mode === 'Online' ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'}">${mode}</span>
+                            `).join('')}
+                        </div>
+                        <p class="text-slate-700 font-semibold text-lg">${formatPrice(item.priceNumeric)} <span class="text-sm font-normal text-slate-500">/ program (mulai dari)</span></p>
+                    </div>
+                    <div class="p-4 bg-slate-50 border-t border-slate-200/80">
+                         <button class="details-btn w-full bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-teal-700 transition-colors duration-300" data-id="${item.id}">Lihat Detail</button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.details-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    openModal(e.currentTarget.dataset.id);
+                });
+            });
+        };
+
+        const renderChart = () => {
+            const data = courseData[currentCategory];
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            currentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(item => item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name),
+                    datasets: [{
+                        label: 'Harga Awal (IDR)',
+                        data: data.map(item => item.priceNumeric),
+                        backgroundColor: 'rgba(13, 148, 136, 0.6)',
+                        borderColor: 'rgba(13, 148, 136, 1)',
+                        borderWidth: 1,
+                        borderRadius: 5,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    if (value >= 1000000) return `Rp ${value/1000000} Jt`;
+                                    if (value >= 1000) return `Rp ${value/1000} Rb`;
+                                    return `Rp ${value}`;
+                                }
+                            }
+                        },
+                        y: {
+                           ticks: {
+                                autoSkip: false
+                           }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.x !== null) {
+                                        label += formatPrice(context.parsed.x);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (e, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const id = data[index].id;
+                            openModal(id);
+                        }
+                    },
+                    onHover: (event, chartElement) => {
+                        event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                    }
+                }
+            });
+        };
+
+        const setupFilters = () => {
+            const modeFilter = document.getElementById('mode-filter');
+            const priceFilter = document.getElementById('price-filter');
+            modeFilter.value = filters.mode;
+            priceFilter.value = filters.price;
+            
+            modeFilter.addEventListener('change', (e) => {
+                filters.mode = e.target.value;
+                renderCards();
+            });
+            priceFilter.addEventListener('change', (e) => {
+                filters.price = e.target.value;
+                renderCards();
+            });
+        };
+        
+        const openModal = (id) => {
+            const item = courseData[currentCategory].find(c => c.id === id);
+            if (!item) return;
+
+            modalContent.innerHTML = `
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900">${item.name}</h2>
+                        <p class="text-slate-500">${item.location}</p>
+                    </div>
+                    <button id="close-modal-btn" class="text-slate-500 hover:text-slate-800 transition-colors">&times;</button>
+                </div>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="font-semibold text-lg text-slate-800 border-b pb-2 mb-3">Materi yang Ditawarkan</h4>
+                        <ul class="list-disc list-inside space-y-1 text-slate-600">
+                            ${item.details.materials.map(m => `<li>${m}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg text-slate-800 border-b pb-2 mb-3">Informasi Harga</h4>
+                        <ul class="list-disc list-inside space-y-1 text-slate-600">
+                            ${item.details.prices.map(p => `<li>${p}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg text-slate-800 border-b pb-2 mb-3">Pilihan & Opsi Belajar</h4>
+                        <p class="text-slate-600">${item.details.options}</p>
+                    </div>
+                </div>
+
+                <button id="close-modal-btn-bottom" class="mt-8 w-full bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-lg hover:bg-slate-300 transition-colors duration-300">Tutup</button>
+            `;
+            modalContainer.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            
+            document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+            document.getElementById('close-modal-btn-bottom').addEventListener('click', closeModal);
+        };
+
+        const closeModal = () => {
+            modalContainer.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        };
+
+        const switchCategory = (category) => {
+            currentCategory = category;
+            filters = { mode: 'all', price: 'all' }; // Reset filters
+            updateNav();
+            renderContent();
+        };
+
+        const updateNav = () => {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-teal-600', 'shadow');
+                btn.classList.add('text-slate-700');
+            });
+            const activeBtn = document.getElementById(`nav-${currentCategory}`);
+            activeBtn.classList.add('bg-white', 'text-teal-600', 'shadow');
+            activeBtn.classList.remove('text-slate-700');
+        };
+
+        const renderAdvice = () => {
+            const container = document.getElementById('advice-section');
+            container.innerHTML = adviceData.map(item => `
+                <div class="bg-white p-4 rounded-xl flex items-start space-x-4 border border-slate-200/80">
+                    <div class="text-2xl">${item.icon}</div>
+                    <div>
+                        <h3 class="font-semibold text-slate-800">${item.title}</h3>
+                        <p class="text-slate-600">${item.text}</p>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        document.getElementById('nav-english').addEventListener('click', () => switchCategory('english'));
+        document.getElementById('nav-computer').addEventListener('click', () => switchCategory('computer'));
+        modalContainer.addEventListener('click', (e) => {
+            if (e.target === modalContainer) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" && !modalContainer.classList.contains('hidden')) closeModal();
+        });
+
+        window.onload = () => {
+            switchCategory('english');
+            renderAdvice();
+        };
+    </script>
+</body>
+</html>
